@@ -240,7 +240,8 @@ function TrackPlayer({ track }) {
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 
-function Nav({ tab, setTab, hasBlog, hasVideos }) {
+function Nav({ tab, setTab, hasBlog }) {
+  const [open, setOpen] = useState(false)
   const tabs = [
     { key: 'inicio',   label: 'Inicio'   },
     { key: 'booking',  label: 'Booking'  },
@@ -248,19 +249,47 @@ function Nav({ tab, setTab, hasBlog, hasVideos }) {
     { key: 'videos',   label: 'Videos'   },
     ...(hasBlog ? [{ key: 'blog', label: 'Blog' }] : []),
   ]
+
+  function go(key) { setTab(key); setOpen(false) }
+
   return (
-    <nav className="sticky top-0 z-50 flex items-center justify-between px-6 md:px-10 py-4 bg-c-bg/90 backdrop-blur-md border-b border-c-accent/25">
-      <button onClick={() => setTab('inicio')}
-        className="text-xl font-black uppercase tracking-widest hover:text-c-accent3 transition-colors">
-        Co<span className="text-c-accent2">val</span>ente
-      </button>
-      <div className="flex items-center gap-0.5">
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold uppercase tracking-wider transition-colors ${tab === t.key ? 'text-c-accent3 bg-c-accent/15' : 'text-c-muted hover:text-c-text'}`}>
-            {t.label}
-          </button>
-        ))}
+    <nav className="sticky top-0 z-50 bg-c-bg/90 backdrop-blur-md border-b border-c-accent/25">
+      <div className="flex items-center justify-between px-6 md:px-10 py-4">
+        <button onClick={() => go('inicio')}
+          className="text-xl font-black uppercase tracking-widest hover:text-c-accent3 transition-colors">
+          Co<span className="text-c-accent2">val</span>ente
+        </button>
+
+        {/* Desktop tabs */}
+        <div className="hidden md:flex items-center gap-0.5">
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => go(t.key)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold uppercase tracking-wider transition-colors ${tab === t.key ? 'text-c-accent3 bg-c-accent/15' : 'text-c-muted hover:text-c-text'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Hamburger button */}
+        <button onClick={() => setOpen(o => !o)}
+          className="md:hidden flex flex-col gap-[5px] p-2 rounded-lg hover:bg-c-accent/10 transition-colors"
+          aria-label="Menú">
+          <span className={`block w-6 h-0.5 bg-c-text transition-all duration-300 origin-center ${open ? 'rotate-45 translate-y-[7px]' : ''}`} />
+          <span className={`block w-6 h-0.5 bg-c-text transition-all duration-300 ${open ? 'opacity-0 scale-x-0' : ''}`} />
+          <span className={`block w-6 h-0.5 bg-c-text transition-all duration-300 origin-center ${open ? '-rotate-45 -translate-y-[7px]' : ''}`} />
+        </button>
+      </div>
+
+      {/* Mobile dropdown */}
+      <div className={`md:hidden overflow-hidden transition-all duration-300 ease-out ${open ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+        <div className="px-4 pb-4 space-y-1 border-t border-c-accent/15">
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => go(t.key)}
+              className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold uppercase tracking-wider transition-colors ${tab === t.key ? 'text-c-accent3 bg-c-accent/15' : 'text-c-muted hover:text-c-text hover:bg-c-accent/8'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
     </nav>
   )
