@@ -245,8 +245,8 @@ function Nav({ tab, setTab, hasBlog, hasVideos }) {
     { key: 'inicio',   label: 'Inicio'   },
     { key: 'booking',  label: 'Booking'  },
     { key: 'shows',    label: 'Shows'    },
-    ...(hasBlog   ? [{ key: 'blog',   label: 'Blog'   }] : []),
-    ...(hasVideos ? [{ key: 'videos', label: 'Videos' }] : []),
+    { key: 'videos',   label: 'Videos'   },
+    ...(hasBlog ? [{ key: 'blog', label: 'Blog' }] : []),
   ]
   return (
     <nav className="sticky top-0 z-50 flex items-center justify-between px-6 md:px-10 py-4 bg-c-bg/90 backdrop-blur-md border-b border-c-accent/25">
