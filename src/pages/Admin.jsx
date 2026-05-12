@@ -185,6 +185,7 @@ function PostsPanel({ posts, reload, toast }) {
           <Field label="Imagen (opcional)">
             <input type="file" accept="image/*" onChange={e => setImgFile(e.target.files[0])}
               className="w-full text-sm text-c-muted file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:bg-c-accent file:text-white file:text-xs file:font-semibold file:cursor-pointer" />
+            <p className="mt-1 text-xs text-c-muted">JPG/PNG · 1200×630px recomendado · máx 3 MB</p>
             {modal.image_url && !imgFile && <img src={modal.image_url} alt="" className="mt-2 h-20 rounded-lg object-cover" />}
           </Field>
         </Modal>
@@ -257,6 +258,7 @@ function VideosPanel({ videos, reload, toast }) {
           <Field label={modal.isNew ? 'Archivo de video *' : 'Reemplazar video (opcional)'}>
             <input type="file" accept="video/mp4,video/webm,video/*" onChange={e => setVideoFile(e.target.files[0])}
               className="w-full text-sm text-c-muted file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:bg-c-accent file:text-white file:text-xs file:font-semibold file:cursor-pointer" />
+            <p className="mt-1 text-xs text-c-muted">MP4 · 720p o 1080p · H.264 · máx 100 MB · hasta 5 min recomendado</p>
             {modal.url && !videoFile && (
               <p className="mt-1 text-xs text-c-muted truncate">Actual: {modal.url.split('/').pop()}</p>
             )}
@@ -509,6 +511,7 @@ function TracksPanel({ tracks, reload, toast }) {
           <Field label={modal.isNew ? 'Archivo MP3 *' : 'Reemplazar MP3 (opcional)'}>
             <input type="file" accept="audio/mp3,audio/mpeg,audio/*" onChange={e => setAudioFile(e.target.files[0])}
               className="w-full text-sm text-c-muted file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:bg-c-accent file:text-white file:text-xs file:font-semibold file:cursor-pointer" />
+            <p className="mt-1 text-xs text-c-muted">MP3 · 128–320 kbps · máx 20 MB</p>
             {modal.audio_url && !audioFile && (
               <p className="mt-1 text-xs text-c-muted truncate">Actual: {modal.audio_url.split('/').pop()}</p>
             )}
@@ -516,6 +519,7 @@ function TracksPanel({ tracks, reload, toast }) {
           <Field label="Portada (opcional)">
             <input type="file" accept="image/*" onChange={e => setCoverFile(e.target.files[0])}
               className="w-full text-sm text-c-muted file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:bg-c-accent file:text-white file:text-xs file:font-semibold file:cursor-pointer" />
+            <p className="mt-1 text-xs text-c-muted">JPG/PNG · 400×400px cuadrada · máx 2 MB</p>
             {modal.cover_url && !coverFile && <img src={modal.cover_url} alt="" className="mt-2 h-16 rounded-lg object-cover" />}
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -586,7 +590,7 @@ function SettingsPanel({ settings, reload, toast }) {
               onChange={e => { const f = e.target.files[0]; if (f) handleCoverUpload(f) }}
               className="w-full text-sm text-c-muted file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:bg-c-accent file:text-white file:text-xs file:font-semibold file:cursor-pointer" />
             {coverUploading && <p className="text-xs text-c-muted mt-1">Subiendo foto...</p>}
-            <p className="text-xs text-c-muted mt-1">Se muestra en la sección "La banda" e inicio del Booking.</p>
+            <p className="text-xs text-c-muted mt-1">JPG/PNG · 1280×720px (16:9) recomendado · máx 5 MB · aparece en "La banda" y Booking.</p>
           </Field>
           <Field label="Géneros (separados por coma)">
             <input type="text" value={form.band_genres||''} onChange={set('band_genres')}
@@ -725,6 +729,7 @@ function MembersPanel({ members, reload, toast }) {
           <Field label="Foto (opcional)">
             <input type="file" accept="image/*" onChange={e => setPhotoFile(e.target.files[0])}
               className="w-full text-sm text-c-muted file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:bg-c-accent file:text-white file:text-xs file:font-semibold file:cursor-pointer" />
+            <p className="mt-1 text-xs text-c-muted">JPG/PNG · cuadrada (1:1) · 400×400px recomendado · máx 2 MB</p>
             {modal.photo_url && !photoFile && (
               <img src={modal.photo_url} alt="" className="mt-2 w-16 h-16 rounded-full object-cover" />
             )}

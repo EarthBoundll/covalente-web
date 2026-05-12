@@ -107,6 +107,28 @@ function SocialLink({ href, icon, label }) {
   )
 }
 
+// ── Spotify embed with loading state ─────────────────────────────────────────
+
+function SpotifyEmbed({ src, height = 352 }) {
+  const [loaded, setLoaded] = useState(false)
+  return (
+    <div className="relative rounded-2xl overflow-hidden border border-c-accent/25" style={{ minHeight: height }}>
+      {!loaded && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-c-bg3">
+          <div className="w-10 h-10 rounded-full bg-[#1DB954]/20 flex items-center justify-center">
+            <SpotifyIcon />
+          </div>
+          <p className="text-c-muted text-sm">Cargando Spotify...</p>
+        </div>
+      )}
+      <iframe src={src} width="100%" height={height} frameBorder="0" allowFullScreen loading="lazy"
+        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        className={`block transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        onLoad={() => setLoaded(true)} />
+    </div>
+  )
+}
+
 // ── Tab panel fade-in on mount ────────────────────────────────────────────────
 
 function TabPanel({ children }) {
@@ -467,10 +489,7 @@ function InicioTab({ igPosts, tracks, members, settings }) {
         <FadeSection>
           <section className="py-14 px-8 max-w-5xl mx-auto">
             <SectionHead label="Escúchanos" title="Spotify" />
-            <div className="rounded-2xl overflow-hidden border border-c-accent/25">
-              <iframe src={embed} width="100%" height="352" frameBorder="0" allowFullScreen loading="lazy"
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" className="block" />
-            </div>
+            <SpotifyEmbed src={embed} height={352} />
           </section>
         </FadeSection>
       )}
@@ -542,10 +561,7 @@ function BookingTab({ members, shows, tracks, settings }) {
                     {genres.map(g => <Tag key={g}>{g}</Tag>)}
                   </div>
                 )}
-                {bio
-                  ? <p className="text-c-muted leading-relaxed whitespace-pre-wrap">{bio}</p>
-                  : <p className="text-c-muted text-sm italic opacity-60">Añade una bio desde Admin → Config → La banda.</p>
-                }
+                {bio && <p className="text-c-muted leading-relaxed whitespace-pre-wrap">{bio}</p>}
                 <div className="flex flex-wrap gap-3 mt-6">
                   <SocialLink href="https://www.instagram.com/covalente.banda/" icon={<IGIcon/>} label="Instagram" />
                   {[
@@ -641,9 +657,8 @@ function BookingTab({ members, shows, tracks, settings }) {
             <div className="bg-c-bg2 border border-c-accent/25 rounded-2xl p-8">
               <h2 className="font-black text-xl mb-6">Música</h2>
               {spotifyEmbed && (
-                <div className="rounded-xl overflow-hidden mb-5">
-                  <iframe src={spotifyEmbed} width="100%" height="232" frameBorder="0" allowFullScreen loading="lazy"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" className="block" />
+                <div className="mb-5">
+                  <SpotifyEmbed src={spotifyEmbed} height={232} />
                 </div>
               )}
               {tracks.length > 0 && (
@@ -696,8 +711,8 @@ function BookingTab({ members, shows, tracks, settings }) {
 
         {!hasContact && !desc && !highlights && shows.length === 0 && (
           <div className="border border-dashed border-c-accent/30 rounded-2xl p-12 text-center text-c-muted text-sm">
-            <p className="text-lg font-black text-c-text mb-2">Completa tu CV musical</p>
-            <p>Ve a <strong className="text-c-text">Admin → Config</strong> y rellena la sección Booking.</p>
+            <p className="text-lg font-black text-c-text mb-2">Próximamente</p>
+            <p>Información de booking y contrataciones disponible pronto.</p>
           </div>
         )}
 
