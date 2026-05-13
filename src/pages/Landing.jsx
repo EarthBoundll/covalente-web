@@ -1,16 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const audioRegistry = new Set()
+const SettingsCtx = createContext({})
 
 function embedSpotify(url) {
   const m = url.match(/spotify\.com(?:\/intl-[a-z-]+)?(?:\/embed)?\/(artist|album|track|playlist|episode|show)\/([A-Za-z0-9]+)/)
   return m ? `https://open.spotify.com/embed/${m[1]}/${m[2]}?theme=0` : url
-}
-
-function igShortcode(url) {
-  const m = url.match(/instagram\.com\/(?:p|reel|tv)\/([^/?]+)/)
-  return m ? m[1] : null
 }
 
 function fmtDate(str) {
@@ -83,15 +80,17 @@ function Tag({ children }) {
   )
 }
 
-function SectionHead({ label, title }) {
+function SectionHead({ label, title, titleKey }) {
+  const settings = useContext(SettingsCtx)
   const [ref, vis] = useFadeIn()
+  const displayTitle = (titleKey && settings[`title_${titleKey}`]) || title
   return (
     <div ref={ref}>
       <p className={`text-[11px] font-bold uppercase tracking-[0.2em] text-c-accent2 mb-1 transition-all duration-500 ${vis ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-5'}`}>
         {label}
       </p>
       <h2 className={`text-3xl md:text-4xl font-black mb-4 transition-all duration-500 delay-75 ${vis ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-5'}`}>
-        {title}
+        {displayTitle}
       </h2>
       <div className={`w-12 h-0.5 bg-gradient-to-r from-c-accent to-c-accent2 rounded-full mb-8 origin-left transition-all duration-700 delay-150 ${vis ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'}`} />
     </div>
@@ -133,10 +132,7 @@ function SpotifyEmbed({ src, height = 352 }) {
 
 function TabPanel({ children }) {
   const [vis, setVis] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => setVis(true), 40)
-    return () => clearTimeout(t)
-  }, [])
+  useEffect(() => { const t = setTimeout(() => setVis(true), 40); return () => clearTimeout(t) }, [])
   return (
     <div className={`transition-opacity duration-500 ${vis ? 'opacity-100' : 'opacity-0'}`}>
       {children}
@@ -167,9 +163,23 @@ function TrackPlayer({ track }) {
   const pct    = dur ? (time / dur) * 100 : 0
   const volPct = muted ? 0 : vol * 100
 
+  useEffect(() => {
+    const el = ref.current
+    audioRegistry.add(el)
+    const onPause = () => setPlaying(false)
+    el.addEventListener('pause', onPause)
+    return () => { audioRegistry.delete(el); el.removeEventListener('pause', onPause) }
+  }, [])
+
   function toggle() {
-    if (playing) ref.current.pause(); else ref.current.play()
-    setPlaying(p => !p)
+    if (playing) {
+      ref.current.pause()
+      setPlaying(false)
+    } else {
+      audioRegistry.forEach(el => { if (el !== ref.current) el.pause() })
+      ref.current.play()
+      setPlaying(true)
+    }
   }
 
   function seek(e) {
@@ -221,14 +231,14 @@ function TrackPlayer({ track }) {
               style={{ width: `${pct}%` }} />
           </div>
 
-          <span className="text-c-muted text-[11px] flex-shrink-0 tabular-nums hidden sm:inline">
+          <span className="text-c-muted text-[11px] flex-shrink-0 tabular-nums">
             {fmtTime(time)}/{fmtTime(dur)}
           </span>
 
           <button onClick={toggleMute} className="text-sm flex-shrink-0 text-c-muted hover:text-c-text transition-colors">
             {volIcon}
           </button>
-          <div className="w-14 h-1.5 bg-c-bg3 rounded-full cursor-pointer flex-shrink-0 hidden sm:block" onClick={changeVol}>
+          <div className="w-14 h-2 bg-c-bg3 rounded-full cursor-pointer flex-shrink-0" onClick={changeVol}>
             <div className="h-full bg-c-muted/60 rounded-full pointer-events-none transition-all"
               style={{ width: `${volPct}%` }} />
           </div>
@@ -270,7 +280,7 @@ function Nav({ tab, setTab, hasBlog }) {
           ))}
         </div>
 
-        {/* Hamburger button */}
+        {/* Hamburger */}
         <button onClick={() => setOpen(o => !o)}
           className="md:hidden flex flex-col gap-[5px] p-2 rounded-lg hover:bg-c-accent/10 transition-colors"
           aria-label="Menú">
@@ -285,7 +295,7 @@ function Nav({ tab, setTab, hasBlog }) {
         <div className="px-4 pb-4 space-y-1 border-t border-c-accent/15">
           {tabs.map(t => (
             <button key={t.key} onClick={() => go(t.key)}
-              className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold uppercase tracking-wider transition-colors ${tab === t.key ? 'text-c-accent3 bg-c-accent/15' : 'text-c-muted hover:text-c-text hover:bg-c-accent/8'}`}>
+              className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold uppercase tracking-wider transition-colors ${tab === t.key ? 'text-c-accent3 bg-c-accent/15' : 'text-c-muted hover:text-c-text'}`}>
               {t.label}
             </button>
           ))}
@@ -322,7 +332,6 @@ function Hero({ settings }) {
     <section className="relative flex flex-col items-center justify-center text-center px-8 pt-16 pb-14 overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(123,47,190,0.3),transparent_70%)] pointer-events-none" />
 
-      {/* Avatar */}
       <div className={`relative w-36 h-36 mb-6 ${anim} ${entered ? `${show} scale-100` : `${hide} scale-90`}`}
         style={{ transitionDelay: '0ms' }}>
         <div className="absolute -inset-2 rounded-full border border-c-accent2/25 animate-pulse" />
@@ -331,33 +340,20 @@ function Hero({ settings }) {
           className="relative z-10 w-full h-full rounded-full object-cover border-[3px] border-c-bg" />
       </div>
 
-      {/* Handle */}
-      <p className={`text-sm text-c-muted tracking-widest mb-2 ${anim} ${entered ? show : hide}`}
-        style={{ transitionDelay: '100ms' }}>
+      <p className={`text-sm text-c-muted tracking-widest mb-2 ${anim} ${entered ? show : hide}`} style={{ transitionDelay: '100ms' }}>
         @covalente.banda
       </p>
-
-      {/* Title */}
       <h1 className={`text-[clamp(2.5rem,8vw,5.5rem)] font-black tracking-tight leading-none mb-4 bg-gradient-to-br from-white via-c-accent3 to-c-accent2 bg-clip-text text-transparent ${anim} ${entered ? show : hide}`}
         style={{ transitionDelay: '200ms' }}>
         Covalente
       </h1>
-
-      {/* Genre tags */}
-      <div className={`flex flex-wrap gap-2 justify-center mb-4 ${anim} ${entered ? show : hide}`}
-        style={{ transitionDelay: '300ms' }}>
+      <div className={`flex flex-wrap gap-2 justify-center mb-4 ${anim} ${entered ? show : hide}`} style={{ transitionDelay: '300ms' }}>
         {genres.map(t => <Tag key={t}>{t}</Tag>)}
       </div>
-
-      {/* Location */}
-      <p className={`text-sm text-c-muted tracking-wider mb-8 ${anim} ${entered ? show : hide}`}
-        style={{ transitionDelay: '400ms' }}>
+      <p className={`text-sm text-c-muted tracking-wider mb-8 ${anim} ${entered ? show : hide}`} style={{ transitionDelay: '400ms' }}>
         📍 {location}
       </p>
-
-      {/* Buttons */}
-      <div className={`flex flex-wrap gap-3 justify-center ${anim} ${entered ? show : hide}`}
-        style={{ transitionDelay: '500ms' }}>
+      <div className={`flex flex-wrap gap-3 justify-center ${anim} ${entered ? show : hide}`} style={{ transitionDelay: '500ms' }}>
         <a href="https://www.instagram.com/covalente.banda/" target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-gradient-to-r from-c-accent to-c-accent2 text-white font-bold text-sm shadow-[0_0_25px_rgba(123,47,190,0.35)] hover:-translate-y-0.5 hover:shadow-[0_0_35px_rgba(123,47,190,0.55)] transition-all">
           <IGIcon /> Instagram
@@ -406,7 +402,6 @@ function MemberThumb({ member, idx, active, onClick }) {
 function MemberDetail({ member }) {
   const [vis, setVis] = useState(false)
   useEffect(() => { const t = setTimeout(() => setVis(true), 20); return () => clearTimeout(t) }, [])
-
   return (
     <div className={`transition-all duration-500 ease-out ${vis ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}
       mt-8 rounded-2xl overflow-hidden bg-c-bg2 border border-c-accent2/40 shadow-[0_0_40px_rgba(123,47,190,0.15)]`}>
@@ -435,34 +430,21 @@ function MemberDetail({ member }) {
 function MembersSection({ members, settings }) {
   const [active, setActive] = useState(null)
   const [coverRef, coverVis] = useFadeIn()
-
   const coverUrl = settings.band_cover_url || '/instagram/post_3.jpg'
-
-  function toggle(m) {
-    setActive(prev => prev?.id === m.id ? null : m)
-  }
-
+  function toggle(m) { setActive(prev => prev?.id === m.id ? null : m) }
   return (
     <section className="py-16 px-8 max-w-5xl mx-auto">
-      <SectionHead label="Quiénes somos" title="La banda" />
-
-      {/* Foto grupal */}
+      <SectionHead label="Quiénes somos" title="La banda" titleKey="members" />
       <div ref={coverRef}
         className={`transition-all duration-700 ease-out ${coverVis ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.98]'}
           w-full aspect-video rounded-2xl overflow-hidden mb-10 shadow-[0_0_60px_rgba(123,47,190,0.2)]`}>
         <img src={coverUrl} alt="Covalente" className="w-full h-full object-cover" />
       </div>
-
-      {/* Círculos */}
       <div className="flex flex-wrap gap-6 sm:gap-10 justify-center mb-2">
         {members.map((m, i) => (
-          <MemberThumb key={m.id} member={m} idx={i}
-            active={active?.id === m.id}
-            onClick={() => toggle(m)} />
+          <MemberThumb key={m.id} member={m} idx={i} active={active?.id === m.id} onClick={() => toggle(m)} />
         ))}
       </div>
-
-      {/* Panel expandido */}
       {active && <MemberDetail key={active.id} member={active} />}
     </section>
   )
@@ -485,20 +467,150 @@ function IGGrid({ igPosts }) {
   const items = igPosts.length
     ? igPosts.slice(0, 6).map((p, i) => ({ url: p.url, src: `/instagram/post_${i + 1}.jpg` }))
     : [1,2,3,4,5,6].map(n => ({ url: 'https://www.instagram.com/covalente.banda/', src: `/instagram/post_${n}.jpg` }))
-
   return (
     <section className="py-14 px-8 max-w-5xl mx-auto">
-      <SectionHead label="Directo desde Instagram" title="Galería" />
+      <SectionHead label="Directo desde Instagram" title="Galería" titleKey="gallery" />
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-        {items.map((item, i) => (
-          <IGGridItem key={i} item={item} delay={i * 80} />
-        ))}
+        {items.map((item, i) => <IGGridItem key={i} item={item} delay={i * 80} />)}
       </div>
       <p className="text-center mt-5">
         <a href="https://www.instagram.com/covalente.banda/" target="_blank" rel="noopener noreferrer"
           className="text-c-accent3 text-sm hover:underline">Ver perfil completo en Instagram →</a>
       </p>
     </section>
+  )
+}
+
+// ── Drum pad ──────────────────────────────────────────────────────────────────
+
+const drumSounds = {
+  kick: (c) => {
+    const osc = c.createOscillator(), gain = c.createGain()
+    osc.connect(gain); gain.connect(c.destination)
+    osc.frequency.setValueAtTime(200, c.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(0.001, c.currentTime + 0.5)
+    gain.gain.setValueAtTime(1, c.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.5)
+    osc.start(); osc.stop(c.currentTime + 0.5)
+  },
+  snare: (c) => {
+    const n = c.sampleRate * 0.2, buf = c.createBuffer(1, n, c.sampleRate)
+    const d = buf.getChannelData(0)
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 1.5)
+    const src = c.createBufferSource(), gain = c.createGain()
+    src.buffer = buf
+    gain.gain.setValueAtTime(0.9, c.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.2)
+    src.connect(gain); gain.connect(c.destination); src.start()
+  },
+  hihat: (c) => {
+    const n = Math.floor(c.sampleRate * 0.06), buf = c.createBuffer(1, n, c.sampleRate)
+    const d = buf.getChannelData(0)
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 4)
+    const src = c.createBufferSource(), filter = c.createBiquadFilter(), gain = c.createGain()
+    src.buffer = buf; filter.type = 'highpass'; filter.frequency.value = 8000
+    gain.gain.setValueAtTime(0.5, c.currentTime)
+    src.connect(filter); filter.connect(gain); gain.connect(c.destination); src.start()
+  },
+  openhat: (c) => {
+    const n = Math.floor(c.sampleRate * 0.35), buf = c.createBuffer(1, n, c.sampleRate)
+    const d = buf.getChannelData(0)
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 0.8)
+    const src = c.createBufferSource(), filter = c.createBiquadFilter(), gain = c.createGain()
+    src.buffer = buf; filter.type = 'highpass'; filter.frequency.value = 7000
+    gain.gain.setValueAtTime(0.4, c.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.35)
+    src.connect(filter); filter.connect(gain); gain.connect(c.destination); src.start()
+  },
+  tom: (c) => {
+    const osc = c.createOscillator(), gain = c.createGain()
+    osc.connect(gain); gain.connect(c.destination)
+    osc.frequency.setValueAtTime(90, c.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(0.001, c.currentTime + 0.4)
+    gain.gain.setValueAtTime(0.8, c.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.4)
+    osc.start(); osc.stop(c.currentTime + 0.4)
+  },
+  clap: (c) => {
+    for (let i = 0; i < 3; i++) {
+      const t = i * 0.012, n = Math.floor(c.sampleRate * 0.05), buf = c.createBuffer(1, n, c.sampleRate)
+      const d = buf.getChannelData(0)
+      for (let j = 0; j < n; j++) d[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / n, 5)
+      const src = c.createBufferSource(), gain = c.createGain()
+      src.buffer = buf
+      gain.gain.setValueAtTime(0.7, c.currentTime + t)
+      src.connect(gain); gain.connect(c.destination); src.start(c.currentTime + t)
+    }
+  },
+}
+
+const drumPads = [
+  { id: 'kick',    label: 'KICK',     sub: 'bombo',   key: 'A', color: 'from-violet-700 to-purple-900', glow: 'rgba(124,58,237,0.7)'  },
+  { id: 'snare',   label: 'SNARE',    sub: 'caja',    key: 'S', color: 'from-pink-600 to-rose-900',     glow: 'rgba(236,72,153,0.7)'  },
+  { id: 'hihat',   label: 'HI-HAT',   sub: 'cerrado', key: 'D', color: 'from-cyan-600 to-sky-900',      glow: 'rgba(6,182,212,0.7)'   },
+  { id: 'openhat', label: 'OPEN HAT', sub: 'abierto', key: 'F', color: 'from-amber-500 to-orange-800',  glow: 'rgba(245,158,11,0.7)'  },
+  { id: 'tom',     label: 'TOM',      sub: 'tom',     key: 'J', color: 'from-emerald-600 to-teal-900',  glow: 'rgba(5,150,105,0.7)'   },
+  { id: 'clap',    label: 'CLAP',     sub: 'palmas',  key: 'K', color: 'from-red-600 to-rose-900',      glow: 'rgba(220,38,38,0.7)'   },
+]
+
+function DrumPad() {
+  const ctxRef  = useRef(null)
+  const hitRef  = useRef(null)
+  const [activeId, setActiveId] = useState(null)
+
+  function getCtx() {
+    if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)()
+    if (ctxRef.current.state === 'suspended') ctxRef.current.resume()
+    return ctxRef.current
+  }
+
+  function hit(id) {
+    drumSounds[id]?.(getCtx())
+    setActiveId(id)
+    setTimeout(() => setActiveId(a => a === id ? null : a), 130)
+  }
+
+  hitRef.current = hit
+
+  useEffect(() => {
+    const keyMap = { a: 'kick', s: 'snare', d: 'hihat', f: 'openhat', j: 'tom', k: 'clap' }
+    function onKey(e) {
+      if (e.repeat || ['INPUT','TEXTAREA'].includes(e.target.tagName)) return
+      const id = keyMap[e.key.toLowerCase()]
+      if (id) hitRef.current(id)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  return (
+    <FadeSection>
+      <section className="py-14 px-8 max-w-5xl mx-auto">
+        <SectionHead label="Toca con nosotros" title="Beat Lab" titleKey="beatlab" />
+        <p className="text-c-muted text-sm mb-8 -mt-4">
+          Pulsa los pads — o las teclas <span className="font-mono bg-c-bg3 px-1.5 py-0.5 rounded text-c-accent3 text-xs">A S D F J K</span> en tu teclado.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+          {drumPads.map(p => {
+            const isActive = activeId === p.id
+            return (
+              <button key={p.id} onClick={() => hit(p.id)}
+                style={isActive ? { boxShadow: `0 0 35px ${p.glow}` } : {}}
+                className={`bg-gradient-to-br ${p.color} rounded-2xl p-6 sm:p-8 text-white select-none
+                  transition-all duration-100 cursor-pointer
+                  ${isActive ? 'scale-95 brightness-125' : 'hover:scale-[1.02] hover:brightness-110'}
+                  active:scale-95`}>
+                <p className="text-xl sm:text-2xl font-black tracking-wider">{p.label}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs opacity-50 uppercase tracking-widest">{p.sub}</p>
+                  <span className="hidden sm:inline text-xs opacity-30 font-mono">[{p.key}]</span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </section>
+    </FadeSection>
   )
 }
 
@@ -517,7 +629,7 @@ function InicioTab({ igPosts, tracks, members, settings }) {
       {embed && (
         <FadeSection>
           <section className="py-14 px-8 max-w-5xl mx-auto">
-            <SectionHead label="Escúchanos" title="Spotify" />
+            <SectionHead label="Escúchanos" title="Spotify" titleKey="spotify" />
             <SpotifyEmbed src={embed} height={352} />
           </section>
         </FadeSection>
@@ -526,7 +638,7 @@ function InicioTab({ igPosts, tracks, members, settings }) {
       {tracks.length > 0 && (
         <FadeSection>
           <section className="py-14 px-8 max-w-5xl mx-auto">
-            <SectionHead label="Demos y maquetas" title="Música inédita" />
+            <SectionHead label="Demos y maquetas" title="Música inédita" titleKey="music" />
             <div className="space-y-3">
               {tracks.map((t, i) => (
                 <FadeSection key={t.id} delay={i * 80}>
@@ -537,6 +649,8 @@ function InicioTab({ igPosts, tracks, members, settings }) {
           </section>
         </FadeSection>
       )}
+
+      <DrumPad />
 
       <footer className="text-center py-10 px-8 border-t border-c-accent/25 text-c-muted text-sm mt-8">
         <p className="mb-1"><strong className="text-c-text">Covalente</strong> · Rock Alternativo · Lima, Perú</p>
@@ -558,7 +672,6 @@ function BookingTab({ members, shows, tracks, settings }) {
   const rider       = settings.booking_rider       || ''
   const spotifyUrl  = settings.spotify_url         || ''
   const hasContact  = manager || email || phone
-
   const spotifyEmbed = spotifyUrl ? embedSpotify(spotifyUrl) : null
 
   const showsByYear = shows.reduce((acc, s) => {
@@ -572,14 +685,13 @@ function BookingTab({ members, shows, tracks, settings }) {
     <TabPanel>
       <div className="py-14 px-8 max-w-4xl mx-auto space-y-8">
 
-        {/* ── Hero banda ──────────────────────────── */}
         <FadeSection>
           <div className="relative rounded-3xl overflow-hidden bg-c-bg2 border border-c-accent/25">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(123,47,190,0.25),transparent_70%)] pointer-events-none" />
             <div className="relative flex flex-col md:flex-row gap-0 items-stretch">
-              <div className="md:w-72 flex-shrink-0">
+              <div className="md:w-80 flex-shrink-0">
                 <img src={settings.band_cover_url || '/instagram/avatar.jpg'} alt="Covalente"
-                  className="w-full h-64 md:h-full object-cover" />
+                  className="w-full h-72 md:h-full object-cover" />
               </div>
               <div className="flex-1 p-8 md:p-10 flex flex-col justify-center">
                 <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-c-accent2 mb-2">CV Musical · EPK</p>
@@ -594,11 +706,11 @@ function BookingTab({ members, shows, tracks, settings }) {
                 <div className="flex flex-wrap gap-3 mt-6">
                   <SocialLink href="https://www.instagram.com/covalente.banda/" icon={<IGIcon/>} label="Instagram" />
                   {[
-                    { key: 'youtube_url',  icon: <YTIcon/>,     label: 'YouTube'  },
-                    { key: 'tiktok_url',   icon: <TikTokIcon/>, label: 'TikTok'   },
-                    { key: 'facebook_url', icon: <FBIcon/>,     label: 'Facebook' },
-                    { key: 'threads_url',  icon: <ThreadsIcon/>,label: 'Threads'  },
-                    { key: 'spotify_url',  icon: <SpotifyIcon/>,label: 'Spotify'  },
+                    { key: 'youtube_url',  icon: <YTIcon/>,      label: 'YouTube'  },
+                    { key: 'tiktok_url',   icon: <TikTokIcon/>,  label: 'TikTok'   },
+                    { key: 'facebook_url', icon: <FBIcon/>,       label: 'Facebook' },
+                    { key: 'threads_url',  icon: <ThreadsIcon/>, label: 'Threads'  },
+                    { key: 'spotify_url',  icon: <SpotifyIcon/>, label: 'Spotify'  },
                   ].filter(s => settings[s.key]).map(s => (
                     <SocialLink key={s.key} href={settings[s.key]} icon={s.icon} label={s.label} />
                   ))}
@@ -608,7 +720,6 @@ function BookingTab({ members, shows, tracks, settings }) {
           </div>
         </FadeSection>
 
-        {/* ── Descripción shows ───────────────────── */}
         {desc && (
           <FadeSection>
             <div className="bg-c-bg2 border border-c-accent/25 rounded-2xl p-8">
@@ -618,19 +729,16 @@ function BookingTab({ members, shows, tracks, settings }) {
           </FadeSection>
         )}
 
-        {/* ── Trayectoria ─────────────────────────── */}
         {(highlights || shows.length > 0) && (
           <FadeSection>
             <div className="bg-c-bg2 border border-c-accent/25 rounded-2xl p-8">
               <h2 className="font-black text-xl mb-2">Trayectoria en vivo</h2>
               <p className="text-c-muted text-sm mb-6">Escenarios y eventos donde hemos tocado.</p>
-
               {highlights && (
                 <div className="bg-c-accent/10 border border-c-accent/25 rounded-xl p-5 mb-6">
                   <p className="text-c-text leading-relaxed whitespace-pre-wrap">{highlights}</p>
                 </div>
               )}
-
               {years.length > 0 && (
                 <div className="space-y-6">
                   {years.map(year => (
@@ -639,7 +747,10 @@ function BookingTab({ members, shows, tracks, settings }) {
                       <div className="space-y-2 pl-3 border-l border-c-accent/25">
                         {showsByYear[year].map(s => (
                           <div key={s.id} className="flex items-start gap-3 group">
-                            <div className="w-1.5 h-1.5 rounded-full bg-c-accent2 mt-2 flex-shrink-0 group-hover:bg-c-accent3 transition-colors" />
+                            {s.flyer_url && (
+                              <img src={s.flyer_url} alt={s.title} className="w-10 h-10 rounded-lg object-cover flex-shrink-0 mt-0.5" />
+                            )}
+                            {!s.flyer_url && <div className="w-1.5 h-1.5 rounded-full bg-c-accent2 mt-2 flex-shrink-0 group-hover:bg-c-accent3 transition-colors" />}
                             <div>
                               <p className="font-bold text-c-text leading-tight">{s.title}</p>
                               <p className="text-c-muted text-xs mt-0.5">
@@ -657,7 +768,6 @@ function BookingTab({ members, shows, tracks, settings }) {
           </FadeSection>
         )}
 
-        {/* ── Integrantes ─────────────────────────── */}
         {members.length > 0 && (
           <FadeSection>
             <div className="bg-c-bg2 border border-c-accent/25 rounded-2xl p-8">
@@ -680,16 +790,11 @@ function BookingTab({ members, shows, tracks, settings }) {
           </FadeSection>
         )}
 
-        {/* ── Música ──────────────────────────────── */}
         {(spotifyEmbed || tracks.length > 0) && (
           <FadeSection>
             <div className="bg-c-bg2 border border-c-accent/25 rounded-2xl p-8">
               <h2 className="font-black text-xl mb-6">Música</h2>
-              {spotifyEmbed && (
-                <div className="mb-5">
-                  <SpotifyEmbed src={spotifyEmbed} height={232} />
-                </div>
-              )}
+              {spotifyEmbed && <div className="mb-5"><SpotifyEmbed src={spotifyEmbed} height={232} /></div>}
               {tracks.length > 0 && (
                 <div className="space-y-3">
                   {tracks.map(t => <TrackPlayer key={t.id} track={t} />)}
@@ -699,7 +804,6 @@ function BookingTab({ members, shows, tracks, settings }) {
           </FadeSection>
         )}
 
-        {/* ── Contacto ────────────────────────────── */}
         {hasContact && (
           <FadeSection>
             <div className="bg-gradient-to-br from-c-accent/15 to-c-accent2/5 border border-c-accent/30 rounded-2xl p-8">
@@ -728,7 +832,6 @@ function BookingTab({ members, shows, tracks, settings }) {
           </FadeSection>
         )}
 
-        {/* ── Rider ───────────────────────────────── */}
         {rider && (
           <FadeSection>
             <div className="bg-c-bg2 border border-c-accent/25 rounded-2xl p-8">
@@ -744,13 +847,12 @@ function BookingTab({ members, shows, tracks, settings }) {
             <p>Información de booking y contrataciones disponible pronto.</p>
           </div>
         )}
-
       </div>
     </TabPanel>
   )
 }
 
-function BlogTab({ posts }) {
+function BlogTab({ posts, settings }) {
   if (!posts.length) return (
     <TabPanel>
       <div className="text-center py-32 text-c-muted">
@@ -762,7 +864,7 @@ function BlogTab({ posts }) {
   return (
     <TabPanel>
       <div className="py-14 px-8 max-w-3xl mx-auto">
-        <SectionHead label="Novedades" title="Blog" />
+        <SectionHead label="Novedades" title="Blog" titleKey="blog" />
         <div className="space-y-8">
           {posts.map((p, i) => (
             <FadeSection key={p.id} delay={i * 120}>
@@ -782,11 +884,11 @@ function BlogTab({ posts }) {
   )
 }
 
-function ShowsTab({ shows }) {
+function ShowsTab({ shows, settings }) {
   return (
     <TabPanel>
       <div className="py-14 px-8 max-w-5xl mx-auto">
-        <SectionHead label="En vivo" title="Shows" />
+        <SectionHead label="En vivo" title="Shows" titleKey="shows" />
         {shows.length === 0
           ? <p className="text-c-muted">Próximamente nuevas fechas. Síguenos en <a href="https://www.instagram.com/covalente.banda/" target="_blank" rel="noopener noreferrer" className="text-c-accent3 hover:underline">@covalente.banda</a>.</p>
           : (
@@ -795,19 +897,24 @@ function ShowsTab({ shows }) {
                 const d = new Date(s.date + 'T12:00:00')
                 return (
                   <FadeSection key={s.id} delay={i * 80}>
-                    <div className="flex gap-5 items-start bg-c-bg2 border border-c-accent/25 rounded-2xl p-5 hover:border-c-accent2 hover:translate-x-1 hover:shadow-[0_0_20px_rgba(123,47,190,0.1)] transition-all duration-300">
-                      <div className="flex-shrink-0 w-16 bg-gradient-to-br from-c-accent to-c-accent2 rounded-xl p-2 text-center">
-                        <div className="text-2xl font-black text-white leading-none">{String(d.getDate()).padStart(2,'0')}</div>
-                        <div className="text-[9px] uppercase tracking-wider text-white/80">{MONTHS[d.getMonth()]}</div>
-                      </div>
-                      <div>
-                        <div className="font-bold text-lg">{s.title}</div>
-                        <div className="text-c-muted text-sm mt-0.5">
-                          {[s.venue, s.address, s.city, s.time].filter(Boolean).join(' · ')}
+                    <div className="flex items-stretch bg-c-bg2 border border-c-accent/25 rounded-2xl overflow-hidden hover:border-c-accent2 hover:shadow-[0_0_20px_rgba(123,47,190,0.1)] transition-all duration-300">
+                      {s.flyer_url && (
+                        <img src={s.flyer_url} alt={s.title} className="w-24 sm:w-32 flex-shrink-0 object-cover" />
+                      )}
+                      <div className="flex gap-5 items-start p-5 flex-1 min-w-0">
+                        <div className="flex-shrink-0 w-16 bg-gradient-to-br from-c-accent to-c-accent2 rounded-xl p-2 text-center">
+                          <div className="text-2xl font-black text-white leading-none">{String(d.getDate()).padStart(2,'0')}</div>
+                          <div className="text-[9px] uppercase tracking-wider text-white/80">{MONTHS[d.getMonth()]}</div>
                         </div>
-                        <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-c-accent2/15 text-c-accent3 border border-c-accent2/30">
-                          Live Show
-                        </span>
+                        <div className="min-w-0">
+                          <div className="font-bold text-lg leading-tight">{s.title}</div>
+                          <div className="text-c-muted text-sm mt-0.5 truncate">
+                            {[s.venue, s.address, s.city, s.time].filter(Boolean).join(' · ')}
+                          </div>
+                          <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-c-accent2/15 text-c-accent3 border border-c-accent2/30">
+                            Live Show
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </FadeSection>
@@ -821,7 +928,7 @@ function ShowsTab({ shows }) {
   )
 }
 
-function VideosTab({ videos }) {
+function VideosTab({ videos, settings }) {
   if (!videos.length) return (
     <TabPanel>
       <div className="text-center py-32 text-c-muted">
@@ -833,7 +940,7 @@ function VideosTab({ videos }) {
   return (
     <TabPanel>
       <div className="py-14 px-8 max-w-5xl mx-auto">
-        <SectionHead label="En acción" title="Videos" />
+        <SectionHead label="En acción" title="Videos" titleKey="videos" />
         <div className="grid md:grid-cols-2 gap-6">
           {videos.map((v, i) => (
             <FadeSection key={v.id} delay={i * 100}>
@@ -874,29 +981,24 @@ export default function Landing() {
     ]).then(([p, v, s, ig, tr, mb, cfg]) => {
       const settings = {}
       ;(cfg.data ?? []).forEach(row => { settings[row.key] = row.value })
-      setData({
-        posts:    p.data  ?? [],
-        videos:   v.data  ?? [],
-        shows:    s.data  ?? [],
-        igPosts:  ig.data ?? [],
-        tracks:   tr.data ?? [],
-        members:  mb.data ?? [],
-        settings,
-      })
+      setData({ posts: p.data ?? [], videos: v.data ?? [], shows: s.data ?? [], igPosts: ig.data ?? [], tracks: tr.data ?? [], members: mb.data ?? [], settings })
     }).catch(() => {})
   }, [])
 
-  return (
-    <div className="bg-c-bg text-c-text min-h-screen">
-      <Nav tab={tab} setTab={setTab}
-        hasBlog={data.posts.length > 0}
-        hasVideos={data.videos.length > 0} />
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [tab])
 
-      {tab === 'inicio'  && <InicioTab  igPosts={data.igPosts} tracks={data.tracks} members={data.members} settings={data.settings} />}
-      {tab === 'booking' && <BookingTab members={data.members} shows={data.shows} tracks={data.tracks} settings={data.settings} />}
-      {tab === 'blog'    && <BlogTab    posts={data.posts} />}
-      {tab === 'shows'   && <ShowsTab   shows={data.shows} />}
-      {tab === 'videos'  && <VideosTab  videos={data.videos} />}
-    </div>
+  return (
+    <SettingsCtx.Provider value={data.settings}>
+      <div className="bg-c-bg text-c-text min-h-screen">
+        <Nav tab={tab} setTab={setTab} hasBlog={data.posts.length > 0} />
+        {tab === 'inicio'  && <InicioTab  igPosts={data.igPosts} tracks={data.tracks} members={data.members} settings={data.settings} />}
+        {tab === 'booking' && <BookingTab members={data.members} shows={data.shows} tracks={data.tracks} settings={data.settings} />}
+        {tab === 'blog'    && <BlogTab    posts={data.posts} settings={data.settings} />}
+        {tab === 'shows'   && <ShowsTab   shows={data.shows} settings={data.settings} />}
+        {tab === 'videos'  && <VideosTab  videos={data.videos} settings={data.settings} />}
+      </div>
+    </SettingsCtx.Provider>
   )
 }

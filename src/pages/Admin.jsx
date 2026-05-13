@@ -76,14 +76,29 @@ function Toast({ msg, ok }) {
   )
 }
 
-function Modal({ title, onClose, footer, children }) {
+function Modal({ title, onClose, footer, children, saving = false, progress = '' }) {
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-c-bg2 border border-c-accent/30 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+      onClick={saving ? undefined : onClose}>
+      <div className="relative bg-c-bg2 border border-c-accent/30 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}>
+
+        {/* Loading overlay */}
+        {saving && (
+          <div className="absolute inset-0 bg-c-bg2/96 backdrop-blur-sm rounded-2xl z-10 flex flex-col items-center justify-center gap-4">
+            <div className="w-56 space-y-3">
+              <div className="h-1.5 bg-c-bg3 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-c-accent to-c-accent2 rounded-full animate-pulse"
+                  style={{ width: progress ? '80%' : '40%', transition: 'width 0.5s ease' }} />
+              </div>
+              <p className="text-c-muted text-sm text-center">{progress || 'Guardando...'}</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between p-6 pb-0">
           <h3 className="font-black text-lg">{title}</h3>
-          <button onClick={onClose} className="text-c-muted hover:text-c-text text-xl leading-none">✕</button>
+          {!saving && <button onClick={onClose} className="text-c-muted hover:text-c-text text-xl leading-none">✕</button>}
         </div>
         <div className="p-6 space-y-4">{children}</div>
         {footer && <div className="px-6 pb-6 flex justify-end gap-3">{footer}</div>}
@@ -172,6 +187,7 @@ function PostsPanel({ posts, reload, toast }) {
 
       {modal && (
         <Modal title={modal.isNew ? 'Nueva entrada' : 'Editar entrada'} onClose={() => setModal(null)}
+          saving={saving}
           footer={<><Btn variant="outline" onClick={() => setModal(null)}>Cancelar</Btn><Btn onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Btn></>}>
           <Input label="Título" value={form.title||''} onChange={set('title')} placeholder="Título de la entrada" />
           <Textarea label="Contenido" value={form.content||''} onChange={set('content')} placeholder="Escribe aquí..." rows={5} />
@@ -246,9 +262,9 @@ function VideosPanel({ videos, reload, toast }) {
 
       {modal && (
         <Modal title={modal.isNew ? 'Subir video' : 'Editar video'} onClose={() => setModal(null)}
+          saving={saving} progress={uploadProgress}
           footer={
             <div className="flex items-center gap-3 w-full justify-end">
-              {uploadProgress && <span className="text-xs text-c-muted">{uploadProgress}</span>}
               <Btn variant="outline" onClick={() => setModal(null)}>Cancelar</Btn>
               <Btn onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Btn>
             </div>
@@ -278,20 +294,28 @@ function VideosPanel({ videos, reload, toast }) {
 function ShowsPanel({ shows, reload, toast }) {
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState({})
+  const [flyerFile, setFlyerFile] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  function openNew() { setForm({ title: '', venue: '', address: '', city: 'Lima, Perú', time: '', date: today(), published: 'true' }); setModal({ isNew: true }) }
-  function openEdit(item) { setForm({ title: item.title, venue: item.venue||'', address: item.address||'', city: item.city||'Lima, Perú', time: item.time||'', date: item.date, published: String(item.published) }); setModal(item) }
+  function openNew() { setForm({ title: '', venue: '', address: '', city: 'Lima, Perú', time: '', date: today(), published: 'true' }); setFlyerFile(null); setModal({ isNew: true }) }
+  function openEdit(item) {
+    setForm({ title: item.title, venue: item.venue||'', address: item.address||'', city: item.city||'Lima, Perú', time: item.time||'', date: item.date, published: String(item.published) })
+    setFlyerFile(null); setModal(item)
+  }
 
   async function save() {
-    setSaving(true)
+    setSaving(true); setUploadProgress('')
     try {
-      const payload = { title: form.title, venue: form.venue, address: form.address, city: form.city, time: form.time, date: form.date, published: form.published === 'true' }
+      let flyer_url = modal.flyer_url ?? ''
+      if (flyerFile) { setUploadProgress('Subiendo flyer...'); flyer_url = await uploadImage(flyerFile) }
+      setUploadProgress('')
+      const payload = { title: form.title, venue: form.venue, address: form.address, city: form.city, time: form.time, date: form.date, published: form.published === 'true', flyer_url }
       modal.isNew ? await supabase.from('shows').insert(payload) : await supabase.from('shows').update(payload).eq('id', modal.id)
       setModal(null); await reload(); toast(modal.isNew ? 'Show añadido' : 'Show actualizado', true)
     } catch { toast('Error al guardar', false) }
-    setSaving(false)
+    setSaving(false); setUploadProgress('')
   }
 
   async function del(id) {
@@ -324,6 +348,7 @@ function ShowsPanel({ shows, reload, toast }) {
 
       {modal && (
         <Modal title={modal.isNew ? 'Nuevo show' : 'Editar show'} onClose={() => setModal(null)}
+          saving={saving} progress={uploadProgress}
           footer={<><Btn variant="outline" onClick={() => setModal(null)}>Cancelar</Btn><Btn onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Btn></>}>
           <Input label="Nombre del evento" value={form.title||''} onChange={set('title')} placeholder="Ej: YAWAR FEST II" />
           <Input label="Venue / Local" value={form.venue||''} onChange={set('venue')} placeholder="Ej: Resto Bar Camila" />
@@ -338,6 +363,14 @@ function ShowsPanel({ shows, reload, toast }) {
               <option value="true">Publicado</option><option value="false">Borrador</option>
             </Select>
           </div>
+          <Field label="Flyer del evento (opcional)">
+            <input type="file" accept="image/*" onChange={e => setFlyerFile(e.target.files[0])}
+              className="w-full text-sm text-c-muted file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:bg-c-accent file:text-white file:text-xs file:font-semibold file:cursor-pointer" />
+            <p className="mt-1 text-xs text-c-muted">JPG/PNG · proporción vertical (póster) · máx 3 MB</p>
+            {modal.flyer_url && !flyerFile && (
+              <img src={modal.flyer_url} alt="" className="mt-2 h-24 rounded-lg object-cover" />
+            )}
+          </Field>
         </Modal>
       )}
     </>
@@ -421,6 +454,7 @@ function InstagramPanel({ igPosts, reload, toast }) {
 
       {modal && (
         <Modal title={modal.isNew ? 'Añadir post de Instagram' : 'Editar post'} onClose={() => setModal(null)}
+          saving={saving}
           footer={<><Btn variant="outline" onClick={() => setModal(null)}>Cancelar</Btn><Btn onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Btn></>}>
           <Input label="URL del post" type="url" value={form.url||''} onChange={set('url')} placeholder="https://www.instagram.com/p/ABC123/" />
           <Textarea label="Caption (opcional)" value={form.caption||''} onChange={set('caption')} placeholder="Descripción del post..." rows={3} />
@@ -499,9 +533,9 @@ function TracksPanel({ tracks, reload, toast }) {
 
       {modal && (
         <Modal title={modal.isNew ? 'Subir track' : 'Editar track'} onClose={() => setModal(null)}
+          saving={saving} progress={uploadProgress}
           footer={
             <div className="flex items-center gap-3 w-full justify-end">
-              {uploadProgress && <span className="text-xs text-c-muted">{uploadProgress}</span>}
               <Btn variant="outline" onClick={() => setModal(null)}>Cancelar</Btn>
               <Btn onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Btn>
             </div>
@@ -539,6 +573,8 @@ function SettingsPanel({ settings, reload, toast }) {
     'band_cover_url', 'band_bio', 'band_genres', 'band_location',
     'spotify_url', 'youtube_url', 'tiktok_url', 'facebook_url', 'threads_url',
     'booking_highlights', 'booking_description', 'booking_manager', 'booking_email', 'booking_phone', 'booking_rider',
+    'title_members', 'title_gallery', 'title_spotify', 'title_music',
+    'title_beatlab', 'title_shows', 'title_blog', 'title_videos',
   ]
 
   const [form, setForm] = useState(() => {
@@ -655,6 +691,27 @@ function SettingsPanel({ settings, reload, toast }) {
           </Field>
         </div>
 
+        {/* Títulos */}
+        <div className={sectionCls}>
+          <h3 className="font-black text-base mb-1">Títulos de secciones</h3>
+          <p className="text-xs text-c-muted mb-3">Personaliza los títulos que aparecen en la web. Déjalos en blanco para usar el título por defecto.</p>
+          {[
+            { key: 'title_members', label: 'La banda',       ph: 'La banda'       },
+            { key: 'title_gallery', label: 'Galería',        ph: 'Galería'        },
+            { key: 'title_spotify', label: 'Spotify',        ph: 'Spotify'        },
+            { key: 'title_music',   label: 'Música inédita', ph: 'Música inédita' },
+            { key: 'title_beatlab', label: 'Beat Lab',       ph: 'Beat Lab'       },
+            { key: 'title_shows',   label: 'Shows',          ph: 'Shows'          },
+            { key: 'title_blog',    label: 'Blog',           ph: 'Blog'           },
+            { key: 'title_videos',  label: 'Videos',         ph: 'Videos'         },
+          ].map(f => (
+            <Field key={f.key} label={f.label}>
+              <input type="text" value={form[f.key]||''} onChange={set(f.key)}
+                placeholder={f.ph} className={inputCls} />
+            </Field>
+          ))}
+        </div>
+
         <div className="flex justify-end">
           <Btn type="submit" disabled={saving}>{saving ? 'Guardando...' : 'Guardar todo'}</Btn>
         </div>
@@ -716,6 +773,7 @@ function MembersPanel({ members, reload, toast }) {
 
       {modal && (
         <Modal title={modal.isNew ? 'Añadir integrante' : 'Editar integrante'} onClose={() => setModal(null)}
+          saving={saving} progress={saving && photoFile ? 'Subiendo foto...' : ''}
           footer={<><Btn variant="outline" onClick={() => setModal(null)}>Cancelar</Btn><Btn onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Btn></>}>
           <Input label="Nombre" value={form.name||''} onChange={set('name')} placeholder="Ej: Diego Acosta" />
           <Input label="Rol / Instrumento" value={form.role||''} onChange={set('role')} placeholder="Ej: Guitarra y voz" />
