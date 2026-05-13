@@ -554,8 +554,10 @@ const drumPads = [
 ]
 
 function DrumPad() {
-  const ctxRef  = useRef(null)
-  const hitRef  = useRef(null)
+  const ctxRef     = useRef(null)
+  const hitRef     = useRef(null)
+  const sectionRef = useRef(null)
+  const visibleRef = useRef(false)
   const [activeId, setActiveId] = useState(null)
 
   function getCtx() {
@@ -573,8 +575,17 @@ function DrumPad() {
   hitRef.current = hit
 
   useEffect(() => {
+    const el = sectionRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(([e]) => { visibleRef.current = e.isIntersecting }, { threshold: 0.3 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
+  useEffect(() => {
     const keyMap = { a: 'kick', s: 'snare', d: 'hihat', f: 'openhat', j: 'tom', k: 'clap' }
     function onKey(e) {
+      if (!visibleRef.current) return
       if (e.repeat || ['INPUT','TEXTAREA'].includes(e.target.tagName)) return
       const id = keyMap[e.key.toLowerCase()]
       if (id) hitRef.current(id)
@@ -585,7 +596,7 @@ function DrumPad() {
 
   return (
     <FadeSection>
-      <section className="py-14 px-8 max-w-5xl mx-auto">
+      <section ref={sectionRef} className="py-14 px-8 max-w-5xl mx-auto">
         <SectionHead label="Toca con nosotros" title="Beat Lab" titleKey="beatlab" />
         <p className="text-c-muted text-sm mb-8 -mt-4">
           Pulsa los pads — o las teclas <span className="font-mono bg-c-bg3 px-1.5 py-0.5 rounded text-c-accent3 text-xs">A S D F J K</span> en tu teclado.
